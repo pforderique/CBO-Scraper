@@ -1,0 +1,6 @@
+**/__pycache__/
+settings/**
+UserData/
+data/
+
+data/clientinfo.db
