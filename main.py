@@ -1,10 +1,7 @@
 from src.scraper import CPXScraper, clean_string, save_to_csv
 
 if __name__ == "__main__":
-    # print(clean_string('<span>hi</span>'))
-    # save_to_csv([{'name': 'fab', 'age': 22}, {'name': 'Dre', 'age': 25}])
-    bot = CPXScraper()\
-        .go_to_login_page()
+    bot = CPXScraper().go_to_login_page()
 
     if(input('Enter "c" to continue after logging in:') == 'c'):
         bot.scrape([
@@ -12,7 +9,6 @@ if __name__ == "__main__":
             # 'Delaware', 
             # 'Texas',
             # 'Missouri',
-            # 'Kansas', # mistakes with AK
             # 'Arizona', 
             # 'New Mexico', 
             # 'Tennessee', 
@@ -23,7 +19,12 @@ if __name__ == "__main__":
             # 'Louisiana',
             # 'California',
             # 'Colorado',
-            'Missouri', 
-            'Illinois',
-            'Oregon',
+            # 'Missouri', 
+            # 'Illinois',
+            # 'Oregon',
+            # 'Kansas', # mistakes with AK. Manually select this one.
+            'Minnesota',
+            'Wisconsin',
+            'Washington',
+            'New York',
         ])
