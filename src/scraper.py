@@ -1,12 +1,11 @@
 from enum import Enum
 from pprint import pprint
-import re
 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 
-from utils.json_parser import parse_json_to_attr
+from utils.utils import clean_string, parse_json_to_attr, save_to_csv
 
 
 class Page(Enum):
@@ -14,7 +13,7 @@ class Page(Enum):
     CBO_DIRECTORY = 2
     CARD = 3
     LOGIN = 4
-    OTHER = 7
+    OTHER = 5
 
 
 class PageNotFound(Exception):
@@ -47,25 +46,21 @@ class CPXScraper(object):
 
     CPX_SEARCH_URL = 'https://client.cappex.com/cbo-search'
     CPX_LOGIN_URL = 'https://client.cappex.com/login'
-    UNCLICKED_COLOR = '#8e8e8e'
 
     def __init__(self) -> None:
-        # load in webdriver settings and initialize driver
         self.driver = DriverSettings().get_driver()
-
-        # state variables
-        self.logged_in = False
         self.page = Page.NONE
 
     def scrape(self, states: list):
-        for state in states:
-            all_dict_rows = self.\
-                _go_to_search_page()._search_state(state)._scrape_cards()
-            save_to_csv(all_dict_rows, state)
+        for state in states:                
+            save_to_csv(
+                self._go_to_search_page()._search_state(state)._scrape_cards(), 
+                state
+            )
 
-            print(f'********************************************')
+            print(f'******************************************************')
             print(f'*********** STATE <{state}> DONE ***********')
-            print(f'********************************************')
+            print(f'******************************************************')
 
     def go_to_login_page(self):
         self.driver.get(self.CPX_LOGIN_URL)
@@ -79,44 +74,49 @@ class CPXScraper(object):
 
     def _search_state(self, state):
         self._assert_page(Page.CBO_DIRECTORY)
-        CBO_location_button = self.driver.find_element(By.ID, 'filter-button--CBO Location')
-        CBO_location_button.click()
-        state_option = self.driver.find_element(
-            By.XPATH, "(//input[contains(@id,'react-select')])[2]")
-        state_option.send_keys(state, Keys.ENTER, Keys.ESCAPE)
+
+        # click CBO filters button
+        self.driver.find_element(By.ID, 'filter-button--CBO Location').click()
+        
+        # type state and exit filter popup
+        self.driver.find_element(
+            By.XPATH,
+            "(//input[contains(@id,'react-select')])[2]"
+        ).send_keys(state, Keys.ENTER, Keys.ESCAPE)
+
         return self
 
     def _scrape_cards(self):
+        self._assert_page(Page.CBO_DIRECTORY)
         all_card_row_dicts = []
         has_next_page = True
 
+        # go through all pages
         while has_next_page:
             cards = self.driver.find_elements(
-                By.XPATH, "//div[@data-qa='cbo-card-list']//button"
-            )
+                By.XPATH, "//div[@data-qa='cbo-card-list']//button")
+
             for card in cards:
+                print('\nScraping next card...')
                 card_row_info = self._scrape_card(card)
                 all_card_row_dicts.append(card_row_info)
                 print('\n===========', card_row_info['Name'], 'RESULTS ===========')
                 pprint(card_row_info)
 
-            # click next button
-            try:
-                self.driver.find_element(
+            # click next button on bottom of page
+            try: self.driver.find_element(
                     By.XPATH, "//a[@aria-label='Next page']").click()
-            except:
-                has_next_page = False
+            except: has_next_page = False
 
         return all_card_row_dicts
 
     def _scrape_card(self, card):
-        '''Builds one row'''
-        print('scraping card...')
         card.click()
         self.page = Page.CARD
 
         card_window_path = '//div[@role="dialog"]/div'
 
+        # these are all the fields that get scraped for each CBO
         row_results = {
             # these get scraped semi-individually
             'Name': None,
@@ -141,47 +141,44 @@ class CPXScraper(object):
             By.XPATH, card_window_path + '//h5').get_attribute('innerHTML')
         row_results['Name'] = name
         print('card name:', name)
-        
+
         try:
             address = self.driver.find_element(
                 By.XPATH, card_window_path + '//h5//following-sibling::p[last()]').get_attribute('innerHTML')
             
-            address_cleaned = address.replace(',', '').split(' ')
-            city = address_cleaned[-3]
-            state_code = address_cleaned[-2]
-            zip_code = address_cleaned[-1]
+            # TODO(pforderique): add regex parsing to clean up code.
+            address_cleaned = [elem.strip() for elem in address.split(',')]
+            city = address_cleaned[-2]
+            state_code = address_cleaned[-1].split(' ')[0]
+            zip_code = address_cleaned[-1].split(' ')[1]
             row_results['Address'] = address
             row_results['City'] = city
             row_results['State'] = state_code
             row_results['Zip Code'] = zip_code
-        except Exception as e: 
-            print(e)
-            address = None
-        print('address', address)
+        except Exception as e: print(e)
+        print('address', row_results['Address'])
 
-        try: poc = ', '.join(
-            [elem.get_attribute('innerHTML') for elem in\
-                self.driver.find_elements(
-                    By.XPATH,
-                    "(//div[contains(@class, 'MuiGrid-root MuiGrid-container MuiGrid-spacing-xs-4')])[last()]/div//p[not(a)]"
-        )[:-1]] + [self.driver.find_element(
-            By.XPATH,
-            "(//div[contains(@class, 'MuiGrid-root MuiGrid-container MuiGrid-spacing-xs-4')])[last()]/div//p/a"
-            ).get_attribute('innerHTML')
-        ])
-        except Exception as e: 
-            print(e)
-            poc = None
-        row_results['POC'] = poc
-        print('poc', poc)
+        try: 
+            poc = ', '.join([
+                elem.get_attribute('innerHTML') for elem in\
+                    self.driver.find_elements(
+                        By.XPATH,
+                        "(//div[contains(@class, 'MuiGrid-root MuiGrid-container MuiGrid-spacing-xs-4')])[last()]/div//p[not(a)]"
+                    )[:-1]] + [self.driver.find_element(
+                        By.XPATH,
+                        "(//div[contains(@class, 'MuiGrid-root MuiGrid-container MuiGrid-spacing-xs-4')])[last()]/div//p/a"
+                    ).get_attribute('innerHTML')
+            ])
+            row_results['POC'] = poc
+        except Exception as e: print(e)
+        print('poc', row_results['POC'])
 
-        try: website = self.driver.find_element(
-            By.XPATH, card_window_path + '//a').get_attribute('href')
-        except Exception as e:
-            print(e)
-            website = None
-        row_results['Website'] = website
-        print('website', website)
+        try: 
+            website = self.driver.find_element(
+                By.XPATH, card_window_path + '//a').get_attribute('href')
+            row_results['Website'] = website
+        except Exception as e: print(e)
+        print('website', row_results['Website'])
 
         sections = self.driver.find_elements(
             By.XPATH,
@@ -199,8 +196,8 @@ class CPXScraper(object):
                 continue
 
             info = ' '.join([
-            elem.get_attribute('innerHTML')\
-                for elem in section.find_elements(By.TAG_NAME, 'p')
+                elem.get_attribute('innerHTML')\
+                    for elem in section.find_elements(By.TAG_NAME, 'p')
             ])
 
             row_results[title] = info
@@ -208,7 +205,7 @@ class CPXScraper(object):
         for (key, value) in row_results.items():
             row_results[key] = clean_string(str(value))
 
-        # exit out of card
+        # exit out of card to go back to main results page
         self.driver.find_element(By.XPATH, card_window_path + '//following-sibling::button').click()
         self.page = Page.CBO_DIRECTORY
 
@@ -221,14 +218,3 @@ class CPXScraper(object):
         assert self.page in expected_pages, ( 
             f'Expected page to be in { {str(page) for page in expected_pages}}'
             f' but instead was on page {self.page}')
-
-
-def clean_string(str: str):
-    return re.sub('</?[a-z]*>', '', str)
-
-def save_to_csv(dicts: list, filename='info'):
-    import pandas as pd
-
-    path = f'./data/{filename}.csv'
-    df = pd.DataFrame.from_dict(dicts) 
-    df.to_csv (path, index = False, header=True)

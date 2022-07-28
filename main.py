@@ -3,8 +3,14 @@ from src.scraper import CPXScraper, clean_string, save_to_csv
 if __name__ == "__main__":
     bot = CPXScraper().go_to_login_page()
 
-    if(input('Enter "c" to continue after logging in:') == 'c'):
+    if(input(
+        'Enter "c" to continue after you have logged in manually: ') == 'c'):
         bot.scrape([
+            # TODO(pforderique): Kansas gets mistaken for AK. 
+            #   Update scraper to select correct option. 
+            #   Manually select this one for now.
+            # 'Kansas', 
+
             # 'District of Columbia', 
             # 'Delaware', 
             # 'Texas',
@@ -22,9 +28,9 @@ if __name__ == "__main__":
             # 'Missouri', 
             # 'Illinois',
             # 'Oregon',
-            # 'Kansas', # mistakes with AK. Manually select this one.
-            'Minnesota',
+            # 'Minnesota',
+            # 'Wisconsin',
+            # 'New York',
+            # 'Washington',
             'Wisconsin',
-            'Washington',
-            'New York',
         ])

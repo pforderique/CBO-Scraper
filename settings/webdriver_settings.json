@@ -1,0 +1,11 @@
+{
+    "chrome_driver_exe_path": "C:\\Users\\fabri\\Downloads\\chromedriver_win32\\chromedriver.exe",
+    "user_data_dir": "C:\\Users\\fabri\\OneDrive\\Documents\\Programming\\Official-Projects\\CPXScraper\\UserData",
+
+    "driver_timeout": 10,
+    "webdriver_options": {
+        "excludeSwitches": [
+            "enable-logging"
+        ]
+    }
+}
